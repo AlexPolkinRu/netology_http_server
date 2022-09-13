@@ -17,7 +17,7 @@ import java.util.concurrent.Executors;
  */
 
 public class Server {
-    final List<String> validPaths = List.of(
+    final List<String> VALID_PATH = List.of(
             "/index.html",
             "/spring.svg",
             "/spring.png",
@@ -31,20 +31,20 @@ public class Server {
             "/events.js"
     );
 
-    final int port;
+    final int PORT;
 
-    final ExecutorService threadPool;
+    final ExecutorService THREAD_POOL;
 
     public Server(int port, int threadPoolSize) {
-        this.port = port;
-        threadPool = Executors.newFixedThreadPool(threadPoolSize);
+        PORT = port;
+        THREAD_POOL = Executors.newFixedThreadPool(threadPoolSize);
     }
 
     public void start() {
-        try (final var serverSocket = new ServerSocket(port)) {
+        try (final var serverSocket = new ServerSocket(PORT)) {
             while (true) {
                 final var socket = serverSocket.accept();
-                threadPool.submit(() -> processingRequest(socket));
+                THREAD_POOL.submit(() -> processingRequest(socket));
             }
         } catch (IOException e) {
             e.printStackTrace();
@@ -67,7 +67,7 @@ public class Server {
             }
 
             final var path = parts[1];
-            if (!validPaths.contains(path)) {
+            if (!VALID_PATH.contains(path)) {
                 out.write((
                         "HTTP/1.1 404 Not Found\r\n" +
                                 "Content-Length: 0\r\n" +

@@ -16,8 +16,6 @@ import java.util.concurrent.Executors;
 
 public class Server {
 
-    private int port;
-
     private final Map<String, Map<String, Handler>> HANDLERS = new ConcurrentHashMap<>();
     final ExecutorService THREAD_POOL;
 
@@ -45,12 +43,12 @@ public class Server {
             Request request = parseRequest(in);
 
             if (request == null) {
-                badRequest(out);
+                sendResponseBadRequest(out);
             } else {
                 if ((!HANDLERS.containsKey(request.getMethod())) ||
                         (!HANDLERS.get(request.getMethod()).containsKey(request.getPath()))
                 ) {
-                    notFound(out);
+                    sendResponseNotFound(out);
                 } else {
                     HANDLERS.get(request.getMethod()).get(request.getPath()).handle(request, out);
                 }
@@ -90,7 +88,7 @@ public class Server {
         return new Request(method, path, protocol);
     }
 
-    private void badRequest(BufferedOutputStream out) throws IOException {
+    private void sendResponseBadRequest(BufferedOutputStream out) throws IOException {
         out.write((
                 "HTTP/1.1 400 Bad Request\r\n" +
                         "Content-Length: 0\r\n" +
@@ -100,7 +98,7 @@ public class Server {
         out.flush();
     }
 
-    private void notFound(BufferedOutputStream out) throws IOException {
+    private void sendResponseNotFound(BufferedOutputStream out) throws IOException {
         out.write((
                 "HTTP/1.1 404 Not Found\r\n" +
                         "Content-Length: 0\r\n" +

@@ -6,9 +6,9 @@
 public class Main {
     public static void main(String[] args) {
 
-        final int port = 9999;
-        final int threadPoolSize = 64;
+        final int PORT = 9999;
+        final int NUMBER_OF_THREADPOOL = 64;
 
-        new Server(port, threadPoolSize).start();
+        new Server(PORT, NUMBER_OF_THREADPOOL).start();
     }
 }

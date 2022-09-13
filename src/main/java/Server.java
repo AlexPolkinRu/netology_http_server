@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
@@ -66,7 +67,7 @@ public class Server {
         HANDLERS.get(method).put(path, handler);
     }
 
-    private Request parseRequest(BufferedReader in) {
+    private Request parseRequest(BufferedReader in) throws IOException {
         String requestLine;
 
         try {
@@ -74,6 +75,8 @@ public class Server {
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
+
+        System.out.println(requestLine);
 
         String[] parts = requestLine.split(" ");
 
@@ -85,7 +88,24 @@ public class Server {
         String path = parts[1];
         String protocol = parts[2];
 
-        return new Request(method, path, protocol);
+        System.out.println("========================");
+
+        final Map<String, String> HEADERS = new HashMap<>();
+        while (true) {
+            String headerLine = in.readLine();
+            System.out.println(headerLine);
+            String[] partsHeader = headerLine.split(": ");
+            if (partsHeader.length != 2) {
+                break;
+            }
+            HEADERS.put(partsHeader[0], partsHeader[1]);
+        }
+
+        System.out.println("========================");
+
+        return new Request(method, path, protocol, HEADERS);
+
+
     }
 
     private void sendResponseBadRequest(BufferedOutputStream out) throws IOException {

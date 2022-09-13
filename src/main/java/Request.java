@@ -1,3 +1,5 @@
+import java.util.Map;
+
 /**
  * @author Aleksandr Polochkin
  * 11.09.2022
@@ -7,15 +9,14 @@ public class Request {
     private final String METHOD;
     private final String PATH;
     private final String PROTOCOL;
-//    private final Map<String, String> HEADERS;
-//    private final String BODY;
+    private final Map<String, String> HEADERS;
+    private String body;
 
-    public Request(String method, String path, String protocol) {
+    public Request(String method, String path, String protocol, Map<String, String> headers) {
         METHOD = method;
         PATH = path;
         PROTOCOL = protocol;
-//        HEADERS = headers;
-//        BODY = body;
+        HEADERS = headers;
     }
 
     public String getMethod() {
@@ -30,11 +31,11 @@ public class Request {
         return PROTOCOL;
     }
 
-//    public Map<String, String> getHeaders() {
-//        return HEADERS;
-//    }
-//
-//    public String getBody() {
-//        return BODY;
-//    }
+    public Map<String, String> getHeaders() {
+        return HEADERS;
+    }
+
+    public String getBody() {
+        return body;
+    }
 }

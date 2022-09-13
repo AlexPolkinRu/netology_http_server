@@ -1,6 +1,11 @@
+import java.io.BufferedOutputStream;
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.net.ServerSocket;
-import java.util.List;
+import java.net.Socket;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -10,38 +15,99 @@ import java.util.concurrent.Executors;
  */
 
 public class Server {
-    final List<String> validPaths = List.of(
-            "/index.html",
-            "/spring.svg",
-            "/spring.png",
-            "/resources.html",
-            "/styles.css",
-            "/app.js",
-            "/links.html",
-            "/forms.html",
-            "/classic.html",
-            "/events.html",
-            "/events.js"
-    );
 
-    final int port;
+    private int port;
 
-    final ExecutorService threadPool;
+    private final Map<String, Map<String, Handler>> HANDLERS = new ConcurrentHashMap<>();
+    final ExecutorService THREAD_POOL;
 
-    public Server(int port, int threadPoolSize) {
-        this.port = port;
-        threadPool = Executors.newFixedThreadPool(threadPoolSize);
+    public Server(int threadPoolSize) {
+        THREAD_POOL = Executors.newFixedThreadPool(threadPoolSize);
     }
 
-    public void start() {
+    public void listen(int port) {
         try (final var serverSocket = new ServerSocket(port)) {
             while (true) {
                 final var socket = serverSocket.accept();
-                threadPool.submit(new RequestHandler(socket, validPaths));
+                THREAD_POOL.submit(() -> processingRequest(socket));
             }
         } catch (IOException e) {
             e.printStackTrace();
         }
+    }
+
+    public void processingRequest(Socket socket) {
+        try (
+                final var in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+                final var out = new BufferedOutputStream(socket.getOutputStream())
+        ) {
+
+            Request request = parseRequest(in);
+
+            if (request == null) {
+                badRequest(out);
+            } else {
+                if ((!HANDLERS.containsKey(request.getMethod())) ||
+                        (!HANDLERS.get(request.getMethod()).containsKey(request.getPath()))
+                ) {
+                    notFound(out);
+                } else {
+                    HANDLERS.get(request.getMethod()).get(request.getPath()).handle(request, out);
+                }
+            }
+
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void addHandler(String method, String path, Handler handler) {
+        if (!HANDLERS.containsKey(method)) {
+            HANDLERS.put(method, new ConcurrentHashMap<>());
+        }
+        HANDLERS.get(method).put(path, handler);
+    }
+
+    private Request parseRequest(BufferedReader in) {
+        String requestLine;
+
+        try {
+            requestLine = in.readLine();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+
+        String[] parts = requestLine.split(" ");
+
+        if (parts.length != 3) {
+            return null;
+        }
+
+        String method = parts[0];
+        String path = parts[1];
+        String protocol = parts[2];
+
+        return new Request(method, path, protocol);
+    }
+
+    private void badRequest(BufferedOutputStream out) throws IOException {
+        out.write((
+                "HTTP/1.1 400 Bad Request\r\n" +
+                        "Content-Length: 0\r\n" +
+                        "Connection: close\r\n" +
+                        "\r\n"
+        ).getBytes());
+        out.flush();
+    }
+
+    private void notFound(BufferedOutputStream out) throws IOException {
+        out.write((
+                "HTTP/1.1 404 Not Found\r\n" +
+                        "Content-Length: 0\r\n" +
+                        "Connection: close\r\n" +
+                        "\r\n"
+        ).getBytes());
+        out.flush();
     }
 
 }

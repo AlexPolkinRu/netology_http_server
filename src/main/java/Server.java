@@ -104,8 +104,6 @@ public class Server {
         System.out.println("========================");
 
         return new Request(method, path, protocol, HEADERS);
-
-
     }
 
     private void sendResponseBadRequest(BufferedOutputStream out) throws IOException {

@@ -16,67 +16,97 @@ public class Main {
         final var server = new Server(NUMBER_OF_THREADS);
 
         // добавление handler'ов (обработчиков)
-        server.addHandler("GET", "/index.html", (request, out) -> {
-            final var FILE_PATH = Path.of(".", "public", request.getPath());
-            final var MIME_TYPE = Files.probeContentType(FILE_PATH);
-            final var LENGTH = Files.size(FILE_PATH);
+        server.addHandler("POST", "/", (request, out) -> {
+            final var filePath = Path.of(".", "public", "index.html");
+            final var mimeType = Files.probeContentType(filePath);
+            final var length = Files.size(filePath);
             out.write((
                     "HTTP/1.1 200 OK\r\n" +
-                            "Content-Type: " + MIME_TYPE + "\r\n" +
-                            "Content-Length: " + LENGTH + "\r\n" +
+                            "Content-Type: " + mimeType + "\r\n" +
+                            "Content-Length: " + length + "\r\n" +
                             "Connection: close\r\n" +
                             "\r\n"
             ).getBytes());
-            Files.copy(FILE_PATH, out);
+            Files.copy(filePath, out);
+            out.flush();
+        });
+
+        server.addHandler("GET", "/", (request, out) -> {
+            final var filePath = Path.of(".", "public", "index.html");
+            final var mimeType = Files.probeContentType(filePath);
+            final var length = Files.size(filePath);
+            out.write((
+                    "HTTP/1.1 200 OK\r\n" +
+                            "Content-Type: " + mimeType + "\r\n" +
+                            "Content-Length: " + length + "\r\n" +
+                            "Connection: close\r\n" +
+                            "\r\n"
+            ).getBytes());
+            Files.copy(filePath, out);
+            out.flush();
+        });
+
+        server.addHandler("GET", "/index.html", (request, out) -> {
+            final var filePath = Path.of(".", "public", request.getPath());
+            final var mimeType = Files.probeContentType(filePath);
+            final var length = Files.size(filePath);
+            out.write((
+                    "HTTP/1.1 200 OK\r\n" +
+                            "Content-Type: " + mimeType + "\r\n" +
+                            "Content-Length: " + length + "\r\n" +
+                            "Connection: close\r\n" +
+                            "\r\n"
+            ).getBytes());
+            Files.copy(filePath, out);
             out.flush();
         });
 
         server.addHandler("POST", "/index.html", (request, out) -> {
-            final var FILE_PATH = Path.of(".", "public", request.getPath());
-            final var MIME_TYPE = Files.probeContentType(FILE_PATH);
-            final var LENGTH = Files.size(FILE_PATH);
+            final var filePath = Path.of(".", "public", request.getPath());
+            final var mimeType = Files.probeContentType(filePath);
+            final var length = Files.size(filePath);
             out.write((
                     "HTTP/1.1 200 OK\r\n" +
-                            "Content-Type: " + MIME_TYPE + "\r\n" +
-                            "Content-Length: " + LENGTH + "\r\n" +
+                            "Content-Type: " + mimeType + "\r\n" +
+                            "Content-Length: " + length + "\r\n" +
                             "Connection: close\r\n" +
                             "\r\n"
             ).getBytes());
-            Files.copy(FILE_PATH, out);
+            Files.copy(filePath, out);
+            out.flush();
+        });
+
+        server.addHandler("GET", "/forms.html", (request, out) -> {
+            final var filePath = Path.of(".", "public", request.getPath());
+            final var mimeType = Files.probeContentType(filePath);
+            final var length = Files.size(filePath);
+            out.write((
+                    "HTTP/1.1 200 OK\r\n" +
+                            "Content-Type: " + mimeType + "\r\n" +
+                            "Content-Length: " + length + "\r\n" +
+                            "Connection: close\r\n" +
+                            "\r\n"
+            ).getBytes());
+            Files.copy(filePath, out);
             out.flush();
         });
 
         server.addHandler("GET", "/classic.html", (request, out) -> {
-            final var FILE_PATH = Path.of(".", "public", request.getPath());
-            final var MIME_TYPE = Files.probeContentType(FILE_PATH);
-            final var TEMPLATE = Files.readString(FILE_PATH);
-            final var CONTENT = TEMPLATE.replace(
+            final var filePath = Path.of(".", "public", request.getPath());
+            final var mimeType = Files.probeContentType(filePath);
+            final var template = Files.readString(filePath);
+            final var content = template.replace(
                     "{time}",
                     LocalDateTime.now().toString()
             ).getBytes();
             out.write((
                     "HTTP/1.1 200 OK\r\n" +
-                            "Content-Type: " + MIME_TYPE + "\r\n" +
-                            "Content-Length: " + CONTENT.length + "\r\n" +
+                            "Content-Type: " + mimeType + "\r\n" +
+                            "Content-Length: " + content.length + "\r\n" +
                             "Connection: close\r\n" +
                             "\r\n"
             ).getBytes());
-            out.write(CONTENT);
-            out.flush();
-        });
-
-        server.addHandler("GET", "/forms.html", (request, out) -> {
-            final var FILE_PATH = Path.of(".", "public", request.getPath());
-            final var MIME_TYPE = Files.probeContentType(FILE_PATH);
-            final var LENGTH = Files.size(FILE_PATH);
-            out.write((
-                    "HTTP/1.1 200 OK\r\n" +
-                            "Content-Type: " + MIME_TYPE + "\r\n" +
-                            "Content-Length: " + LENGTH + "\r\n" +
-                            "Connection: close\r\n" +
-                            "\r\n"
-            ).getBytes());
-            Files.copy(FILE_PATH, out);
+            out.write(content);
             out.flush();
         });
 

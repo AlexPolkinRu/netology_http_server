@@ -76,6 +76,21 @@ public class Main {
             out.flush();
         });
 
+        server.addHandler("GET", "/forms.html", (request, out) -> {
+            final var filePath = Path.of(".", "public", request.getPath());
+            final var mimeType = Files.probeContentType(filePath);
+            final var length = Files.size(filePath);
+            out.write((
+                    "HTTP/1.1 200 OK\r\n" +
+                            "Content-Type: " + mimeType + "\r\n" +
+                            "Content-Length: " + length + "\r\n" +
+                            "Connection: close\r\n" +
+                            "\r\n"
+            ).getBytes());
+            Files.copy(filePath, out);
+            out.flush();
+        });
+
         server.addHandler("GET", "/classic.html", (request, out) -> {
             final var filePath = Path.of(".", "public", request.getPath());
             final var mimeType = Files.probeContentType(filePath);
@@ -92,21 +107,6 @@ public class Main {
                             "\r\n"
             ).getBytes());
             out.write(content);
-            out.flush();
-        });
-
-        server.addHandler("GET", "/forms.html", (request, out) -> {
-            final var filePath = Path.of(".", "public", request.getPath());
-            final var mimeType = Files.probeContentType(filePath);
-            final var length = Files.size(filePath);
-            out.write((
-                    "HTTP/1.1 200 OK\r\n" +
-                            "Content-Type: " + mimeType + "\r\n" +
-                            "Content-Length: " + length + "\r\n" +
-                            "Connection: close\r\n" +
-                            "\r\n"
-            ).getBytes());
-            Files.copy(filePath, out);
             out.flush();
         });
 

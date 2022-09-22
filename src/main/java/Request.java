@@ -1,10 +1,13 @@
 import org.apache.http.NameValuePair;
-import org.apache.http.client.utils.URLEncodedUtils;
+import org.apache.http.message.BasicNameValuePair;
 
 import java.net.URI;
 import java.nio.charset.Charset;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
+import org.apache.http.client.utils.URLEncodedUtils;
 
 /**
  * @author Aleksandr Polochkin
@@ -61,15 +64,38 @@ public class Request {
         return body;
     }
 
-    public List<NameValuePair> getQueryParam(String name) {
-        var parsedQuery = URLEncodedUtils.parse(uri, Charset.defaultCharset());
-        return parsedQuery.stream()
+    public List<NameValuePair> getPostParams() {
+        List<NameValuePair> nameValuePairList = new ArrayList<>();
+        var decodedBody = java.net.URLDecoder.decode(body, Charset.defaultCharset());
+        var postParamList = Arrays.asList(decodedBody.split("&"));
+        postParamList.forEach(o -> {
+            var pairElement = o.split("=");
+            if (pairElement.length > 2) return;
+            if (pairElement[0].length() == 0) return;
+            if (pairElement.length == 1) {
+                nameValuePairList.add(new BasicNameValuePair(pairElement[0], null));
+                return;
+            }
+            nameValuePairList.add(new BasicNameValuePair(pairElement[0], pairElement[1]));
+        });
+        return nameValuePairList;
+    }
+
+    public List<NameValuePair> getPostParam(String name) {
+        return getPostParams().stream()
                 .filter(o -> o.getName().equals(name))
                 .collect(Collectors.toList());
     }
 
     public List<NameValuePair> getQueryParams() {
         return URLEncodedUtils.parse(uri, Charset.defaultCharset());
+    }
+
+    public List<NameValuePair> getQueryParam(String name) {
+        var parsedQuery = URLEncodedUtils.parse(uri, Charset.defaultCharset());
+        return parsedQuery.stream()
+                .filter(o -> o.getName().equals(name))
+                .collect(Collectors.toList());
     }
 
     @Override
@@ -95,4 +121,5 @@ public class Request {
 
         return sb.toString();
     }
+
 }

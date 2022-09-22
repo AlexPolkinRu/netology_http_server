@@ -128,6 +128,33 @@ public class Server {
         final var headers = Arrays.asList(new String(headersBytes).split("\r\n"));
 
         String body = null;
+        // ищем заголовки
+        final var headersDelimiter = new byte[]{'\r', '\n', '\r', '\n'};
+        final var headersStart = requestLineEnd + requestLineDelimiter.length;
+        final var headersEnd = indexOf(buffer, headersDelimiter, headersStart, read);
+
+        if (headersEnd == -1) {
+            return null;
+        }
+
+        // для GET тела нет
+        if (!method.equals(GET)) {
+            in.skip(headersDelimiter.length);
+            // вычитываем Content-Length, чтобы прочитать body
+            final var contentLength = extractHeader(headers, "Content-Length");
+            if (contentLength.isPresent()) {
+                final var length = Integer.parseInt(contentLength.get());
+                final var bodyBytes = in.readNBytes(length);
+        // отматываем на начало буфера
+        in.reset();
+        // пропускаем requestLine
+        in.skip(headersStart);
+
+                body = new String(bodyBytes);
+        final var headersBytes = in.readNBytes(headersEnd - headersStart);
+        final var headers = Arrays.asList(new String(headersBytes).split("\r\n"));
+
+        String body = null;
 
         // для GET тела нет
         if (!method.equals(GET)) {
@@ -140,10 +167,32 @@ public class Server {
 
                 body = new String(bodyBytes);
             }
+
+//            final var  = extractHeader(headers, "Content-Length");
         }
 
         Request request = new Request(method, requestTarget, protocol, headers, body);
 
+        System.out.println(request);
+        System.out.println("Params from POST:");
+        System.out.println(request.getPostParams());
+
+        System.out.println("Params from POST named \"value\":");
+        System.out.println(request.getPostParam("value"));
+        System.out.println("Params from POST named \"title\":");
+        System.out.println(request.getPostParam("title"));
+
+        return request;
+    }
+
+    private void sendResponseOk(BufferedOutputStream OUT) throws IOException {
+        out.write((
+                "HTTP/1.1 200 OK\r\n" +
+                        "Content-Length: 0\r\n" +
+                        "Connection: close\r\n" +
+                        "\r\n"
+        ).getBytes());
+        out.flush();
         System.out.println(request);
         System.out.println("Query params:");
         System.out.println(request.getQueryParams());

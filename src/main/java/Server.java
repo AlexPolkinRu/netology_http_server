@@ -1,11 +1,9 @@
+import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -17,18 +15,21 @@ import java.util.concurrent.Executors;
 
 public class Server {
 
-    private final Map<String, Map<String, Handler>> HANDLERS = new ConcurrentHashMap<>();
-    final ExecutorService THREAD_POOL;
+    private static final String GET = "GET";
+    private static final String POST = "POST";
+    private final List<String> allowedMethods = List.of(GET, POST);
+    private final Map<String, Map<String, Handler>> handlers = new ConcurrentHashMap<>();
+    private final ExecutorService threadPool;
 
     public Server(int threadPoolSize) {
-        THREAD_POOL = Executors.newFixedThreadPool(threadPoolSize);
+        threadPool = Executors.newFixedThreadPool(threadPoolSize);
     }
 
     public void listen(int port) {
         try (final var serverSocket = new ServerSocket(port)) {
             while (true) {
                 final var socket = serverSocket.accept();
-                THREAD_POOL.submit(() -> processingRequest(socket));
+                threadPool.submit(() -> processingRequest(socket));
             }
         } catch (IOException e) {
             e.printStackTrace();
@@ -37,21 +38,23 @@ public class Server {
 
     public void processingRequest(Socket socket) {
         try (
-                final var in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-                final var out = new BufferedOutputStream(socket.getOutputStream())
+                final var IN = new BufferedInputStream(socket.getInputStream());
+                final var OUT = new BufferedOutputStream(socket.getOutputStream())
         ) {
 
-            Request request = parseRequest(in);
+            final Request request = parseRequest(IN);
 
             if (request == null) {
-                sendResponseBadRequest(out);
+                sendResponseBadRequest(OUT);
             } else {
-                if ((!HANDLERS.containsKey(request.getMethod())) ||
-                        (!HANDLERS.get(request.getMethod()).containsKey(request.getPath()))
+                if ((!handlers.containsKey(request.getMethod())) ||
+                        (!handlers.get(request.getMethod()).containsKey(request.getPath()))
                 ) {
-                    sendResponseNotFound(out);
+                    sendResponseNotFound(OUT);
                 } else {
-                    HANDLERS.get(request.getMethod()).get(request.getPath()).handle(request, out);
+                    handlers.get(request.getMethod())
+                            .get(request.getPath())
+                            .handle(request, OUT);
                 }
             }
 
@@ -61,49 +64,106 @@ public class Server {
     }
 
     public void addHandler(String method, String path, Handler handler) {
-        if (!HANDLERS.containsKey(method)) {
-            HANDLERS.put(method, new ConcurrentHashMap<>());
+        if (!handlers.containsKey(method)) {
+            handlers.put(method, new ConcurrentHashMap<>());
         }
-        HANDLERS.get(method).put(path, handler);
+        handlers.get(method)
+                .put(path, handler);
     }
 
-    private Request parseRequest(BufferedReader in) throws IOException {
-        String requestLine;
+    private Request parseRequest(BufferedInputStream in) throws IOException {
 
-        try {
-            requestLine = in.readLine();
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
+        // лимит на request line + заголовки
+        final var limit = 4096;
 
-        System.out.println(requestLine);
+        in.mark(limit);
+        final var buffer = new byte[limit];
+        final var read = in.read(buffer);
 
-        String[] parts = requestLine.split(" ");
+        // ищем request line
+        final var requestLineDelimiter = new byte[]{'\r', '\n'};
+        final var requestLineEnd = indexOf(buffer, requestLineDelimiter, 0, read);
 
-        if (parts.length != 3) {
+        if (requestLineEnd == -1) {
             return null;
         }
 
-        String method = parts[0];
-        String path = parts[1];
-        String protocol = parts[2];
+        // читаем request line
+        final var requestLine = new String(Arrays.copyOf(buffer, requestLineEnd)).split(" ");
 
-        System.out.println("========================");
-
-        final Map<String, String> HEADERS = new HashMap<>();
-        while (true) {
-            String headerLine = in.readLine();
-            System.out.println(headerLine);
-            String[] partsHeader = headerLine.split(": ");
-            if (partsHeader.length != 2) {
-                break;
-            }
-            HEADERS.put(partsHeader[0], partsHeader[1]);
+        if (requestLine.length != 3) {
+            return null;
         }
 
-        System.out.println("========================");
+        final var method = requestLine[0];
+        if (!allowedMethods.contains(method)) {
+            return null;
+        }
 
-        return new Request(method, path, protocol, HEADERS);
+        final var requestTarget = requestLine[1];
+        if (!requestTarget.startsWith("/")) {
+            return null;
+        }
+
+        final var protocol = requestLine[2];
+        if (!protocol.startsWith("HTTP")) {
+            return null;
+        }
+
+        // ищем заголовки
+        final var headersDelimiter = new byte[]{'\r', '\n', '\r', '\n'};
+        final var headersStart = requestLineEnd + requestLineDelimiter.length;
+        final var headersEnd = indexOf(buffer, headersDelimiter, headersStart, read);
+
+        if (headersEnd == -1) {
+            return null;
+        }
+
+        // отматываем на начало буфера
+        in.reset();
+        // пропускаем requestLine
+        in.skip(headersStart);
+
+        final var headersBytes = in.readNBytes(headersEnd - headersStart);
+        final var headers = Arrays.asList(new String(headersBytes).split("\r\n"));
+
+        String body = null;
+
+        // для GET тела нет
+        if (!method.equals(GET)) {
+            in.skip(headersDelimiter.length);
+            // вычитываем Content-Length, чтобы прочитать body
+            final var contentLength = extractHeader(headers, "Content-Length");
+            if (contentLength.isPresent()) {
+                final var length = Integer.parseInt(contentLength.get());
+                final var bodyBytes = in.readNBytes(length);
+
+                body = new String(bodyBytes);
+            }
+        }
+
+        Request request = new Request(method, requestTarget, protocol, headers, body);
+
+        System.out.println(request);
+        System.out.println("Query params:");
+        System.out.println(request.getQueryParams());
+
+        System.out.println("Query params named \"value\":");
+        System.out.println(request.getQueryParam("value"));
+        System.out.println("Query params named \"title\":");
+        System.out.println(request.getQueryParam("title"));
+
+        return request;
+    }
+
+    private void sendResponseOk(BufferedOutputStream out) throws IOException {
+        out.write((
+                "HTTP/1.1 200 OK\r\n" +
+                        "Content-Length: 0\r\n" +
+                        "Connection: close\r\n" +
+                        "\r\n"
+        ).getBytes());
+        out.flush();
     }
 
     private void sendResponseBadRequest(BufferedOutputStream out) throws IOException {
@@ -124,6 +184,28 @@ public class Server {
                         "\r\n"
         ).getBytes());
         out.flush();
+    }
+
+    private static Optional<String> extractHeader(List<String> headers, String header) {
+        return headers.stream()
+                .filter(o -> o.startsWith(header))
+                .map(o -> o.substring(o.indexOf(" ")))
+                .map(String::trim)
+                .findFirst();
+    }
+
+    // from google guava with modifications
+    private static int indexOf(byte[] array, byte[] target, int start, int max) {
+        outer:
+        for (int i = start; i < max - target.length + 1; i++) {
+            for (int j = 0; j < target.length; j++) {
+                if (array[i + j] != target[j]) {
+                    continue outer;
+                }
+            }
+            return i;
+        }
+        return -1;
     }
 
 }
